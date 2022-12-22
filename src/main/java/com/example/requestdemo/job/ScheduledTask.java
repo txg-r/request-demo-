@@ -72,12 +72,12 @@ public class ScheduledTask {
     }
 
     //发弹幕并领奖励
-    @Scheduled(cron = "30 0 0 * * *")
+    @Scheduled(cron = "20 1 0 * * *")
     public void danmu() throws InterruptedException {
         biliController.sendMsg();
     }
 
-    @Scheduled(cron = "10 1 0 * * *")
+    @Scheduled(cron = "20 2 0 * * *")
     public void danmuReward() throws InterruptedException {
         biliController.dayReward("4");
     }
@@ -85,17 +85,17 @@ public class ScheduledTask {
 
 
     //送礼物并领奖励
-    @Scheduled(cron = "0 3 0 * * *")
+    @Scheduled(cron = "20 3 0 * * *")
     public void gold() throws InterruptedException {
         biliController.sendGold(5);
     }
 
-    @Scheduled(cron = "30 3 0 * * *")
+    @Scheduled(cron = "50 3 0 * * *")
     public void goldReward1() throws InterruptedException {
         biliController.dayReward("3");
     }
 
-    @Scheduled(cron = "10 4 0 * * *")
+    @Scheduled(cron = "30 4 0 * * *")
     public void goldReward2() throws InterruptedException {
         biliController.dayReward("5");
     }

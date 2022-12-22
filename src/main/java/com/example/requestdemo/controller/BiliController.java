@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -22,7 +23,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.PostConstruct;
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -193,7 +200,10 @@ public class BiliController {
             Assert.notNull(node, "response解析错误");
             int code = node.get("code").intValue();
             if (code == 0) {
+                JsonNode protocols = node.get("data").get("protocols");
                 log.info(name + "开播成功");
+                log.info("addr  :" + protocols.get(0).get("addr").asText());
+                log.info("code  :" + protocols.get(0).get("code").asText());
                 return true;
             }
             log.info(name + "开播失败" + node.toString());
@@ -397,6 +407,45 @@ public class BiliController {
 
     private String getRandMsg() {
         return msgList.get(random.nextInt(6));
+    }
+
+    @GetMapping("/getCdk")
+    @ApiOperation("获取所有cdk")
+    public void getCdk(String activity_id, HttpServletResponse response) throws IOException {
+        group.clear();
+        group.setGlobalUrl("https://api.bilibili.com/x/activity/rewards/awards/mylist");
+        group.setMethod("get");
+        group.setInterval(200);
+        group.getGlobalParams().put("activity_id", activity_id);
+        ServletOutputStream outputStream = response.getOutputStream();
+        response.setContentType("text/html");
+        response.setHeader("Content-Disposition", "attachment;fileName=B站cdk.txt");
+        for (Request request : group.getRequests()) {
+            request.setParamFromLib("csrf");
+            request.setHeaderFromLib("cookie");
+        }
+        job.init();
+        job.handlerHttpGroups("B站", "获取所有cdk", (biResponse, name) -> {
+            ObjectNode node = HttpUtil.handleResponse(biResponse);
+            Assert.notNull(node, "response解析错误");
+            if (node.get("code").intValue() == 0) {
+                try {
+                    outputStream.write((name + "\n").getBytes(StandardCharsets.UTF_8));
+                    JsonNode rewardList = node.get("data").get("list");
+                    for (JsonNode rewardNode : rewardList) {
+                        String cdk = rewardNode.get("award_name").asText() + ":\t\t" + rewardNode.get("extra_info").get("cdkey_content").asText()+"\n";
+                        outputStream.write(cdk.getBytes(StandardCharsets.UTF_8));
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                return true;
+            }
+            log.info(name + "领取失败" + node.toString());
+            return false;
+        });
+        outputStream.close();
+
     }
 
 
