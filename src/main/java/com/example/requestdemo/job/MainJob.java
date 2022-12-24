@@ -78,9 +78,9 @@ public class MainJob {
     private void setParams(Group group, Request request, HttpRequestBase http) {
         Map<String, String> params = new HashMap<>();
         //公共参数
-        group.getGlobalParams().forEach(params::put);
+        params.putAll(group.getGlobalParams());
         //个体参数
-        request.getParams().forEach(params::put);
+        params.putAll(request.getParams());
         setParamsByMap(http, params);
     }
 
@@ -105,9 +105,9 @@ public class MainJob {
         // 代理（模拟浏览器版本）
         headers.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36");
         //设置请求头
-        request.getHeaders().forEach(headers::put);
+        headers.putAll(request.getHeaders());
         //公共请求头
-        group.getGlobalHeaders().forEach(headers::put);
+        headers.putAll(group.getGlobalHeaders());
         setHeaderByMap(http,headers);
     }
 
@@ -118,9 +118,9 @@ public class MainJob {
     private void setFormDate(Group group, Request request, HttpRequestBase http) {
         Map<String, String> params = new HashMap<>();
         //单个请求体
-        request.getParams().forEach(params::put);
+        params.putAll(request.getParams());
         //公共请求体
-        group.getGlobalParams().forEach(params::put);
+        params.putAll(group.getGlobalParams());
         setFormDateByMap(http,params);
     }
 

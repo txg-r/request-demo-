@@ -3,6 +3,7 @@ package com.example.requestdemo.controller;
 import com.example.requestdemo.entity.Group;
 import com.example.requestdemo.entity.Request;
 import com.example.requestdemo.job.MainJob;
+import com.example.requestdemo.pojo.AwardParamPojo;
 import com.example.requestdemo.util.HttpUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +16,7 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.tomcat.util.http.fileupload.IOUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -74,49 +76,39 @@ public class BiliController {
         Map<Integer, String> states = new LinkedHashMap<>();
         states.put(0, "领取成功");
         states.put(75086, "已领取");
-//        states.put(75154, "领完了");
+        states.put(75255, "领完了");
+        states.put(75154, "领完了");
+
 
         //任务数量
         AtomicInteger taskNum = new AtomicInteger(group.getRequests().size());
 
         for (Request request : group.getRequests()) {
-            //初始化参数和头
-            Map<String, String> params = new HashMap<>();
-            params.put("id", id);
-            params.put("csrf", request.getParamLib().get("csrf"));
-            Map<String, String> headers = new HashMap<>();
-            headers.put("cookie", request.getHeaderLib().get("cookie"));
             job.getPool().submit(() -> {
+                log.info("原石" + request.getRequestName() + "参数获取中...");
                 //循环查询receive_id参数(是否能够领取)
                 while (true) {
                     //发请求获取结果
-                    ObjectNode node = HttpUtil.handleGet("https://api.bilibili.com/x/activity/mission/single_task", params, headers);
-/*                    try {
-                        Thread.sleep(interval);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }*/
-                    //解析结果,找到需要的参数
-                    Assert.notNull(node, "解析失败");
-                    JsonNode taskInfo = node.get("data").get("task_info");
-                    if (taskInfo.get("receive_id").intValue() == 0) {
-                        log.info("原石" + request.getRequestName() + "参数获取中...");
+                    AwardParamPojo awardParamPojo = getAwardParams(id, request);
+                    Map<String, String> params = awardParamPojo.getParams();
+                    //还不能领取,继续获取参数
+                    if (params.get("receive_id").equals("0")) {
                         continue;
                     }
-                    JsonNode groupNode = taskInfo.get("group_list").get(0);
+                    //已经领取过,直接结束
+                    if (awardParamPojo.getData().get("receive_status").equals("3")){
+                        log.info("原石" + request.getRequestName() + "已领取");
+                        return;
+                    }
                     //设置参数
-                    request.getParams().put("act_id", String.valueOf(groupNode.get("act_id").intValue()));
-                    request.getParams().put("task_id", String.valueOf(groupNode.get("task_id").intValue()));
-                    request.getParams().put("group_id", String.valueOf(groupNode.get("group_id").intValue()));
-                    request.getParams().put("receive_id", String.valueOf(taskInfo.get("receive_id").intValue()));
-                    request.getParams().put("receive_from", "missionPage");
-                    //从参数库中取参数
+                    request.setParams(params);
                     request.setParamFromLib("csrf");
-                    //从请求头库中取请求头
                     request.setHeaderFromLib("cookie");
+                    log.info("原石" + request.getRequestName() + "获取参数成功");
                     break;
                 }
                 //开始发请求领取
+                log.info("原石" + request.getRequestName() + "开始抢原石");
                 HttpPost httpPost = HttpUtil.createPostByRequest(group, request);
                 try (
                         CloseableHttpClient client = HttpClients.createDefault()
@@ -136,7 +128,7 @@ public class BiliController {
                             }
                             break;
                         }
-                        log.info(group.getGroupName() + request.getRequestName() + "原石" + node.toString());
+//                        log.info(group.getGroupName() + request.getRequestName() + "原石" + node.toString());
                     }
                 } catch (IOException e) {
                     log.info(e.getClass().getName());
@@ -144,7 +136,6 @@ public class BiliController {
             });
         }
     }
-
 
     @GetMapping("/dayReward")
     @ApiOperation("每日奖励(1:开播60分钟,2:开播120分钟,3:10电池,4:弹幕六条,5:礼物两人,6:看十分钟")
@@ -167,16 +158,28 @@ public class BiliController {
         states.put(-400, "任务未完成");
         states.put(75086, "已领取");
         states.put(75154, "领完了");
-        if (jobIndex.equals("0")) {
-            rewards.forEach((jobName, id) -> {
-                getReward(id, jobName, states);
-            });
-        } else {
-            if (rewards.get(jobIndex) == null) {
-                getReward(jobIndex, jobIndex, states);
+
+        group.getRequests().forEach(r->{
+            r.setParams(getAwardParams(rewards.get(jobIndex), r).getParams());
+            r.setHeaderFromLib("cookie");
+            r.setParamFromLib("csrf");
+        });
+
+        job.init();
+        //执行并定义处理函数
+        job.handlerHttpGroups("B站", "日常奖励" + jobIndex, (response, name) -> {
+            //结果处理
+            ObjectNode node = HttpUtil.handleResponse(response);
+            Assert.notNull(node, "response解析错误");
+            int code = node.get("code").intValue();
+            String stateInfo = states.getOrDefault(code, null);
+            if (!Objects.isNull(stateInfo)) {
+                log.info(name + "-----------" + stateInfo);
+                return true;
             }
-            getReward(rewards.get(jobIndex), jobIndex, states);
-        }
+            log.info(name + "领取失败(再次尝试)" + node.toString());
+            return false;
+        });
     }
 
     @GetMapping("/start")
@@ -362,53 +365,6 @@ public class BiliController {
 
     }
 
-    private void getReward(String id, String jobName, Map<Integer, String> state) {
-        //设置请求参数和头
-        group.getRequests().forEach(r -> {
-            //初始化参数和头
-            Map<String, String> params = new HashMap<>();
-            params.put("id", id);
-            params.put("csrf", r.getParamLib().get("csrf"));
-            Map<String, String> headers = new HashMap<>();
-            headers.put("cookie", r.getHeaderLib().get("cookie"));
-            //发请求获取结果
-            ObjectNode node = HttpUtil.handleGet("https://api.bilibili.com/x/activity/mission/single_task", params, headers);
-            //解析结果,找到需要的参数
-            assert node != null;
-            JsonNode taskInfo = node.get("data").get("task_info");
-            JsonNode groupNode = taskInfo.get("group_list").get(0);
-            //设置参数
-            r.getParams().put("act_id", String.valueOf(groupNode.get("act_id").intValue()));
-            r.getParams().put("task_id", String.valueOf(groupNode.get("task_id").intValue()));
-            r.getParams().put("group_id", String.valueOf(groupNode.get("group_id").intValue()));
-            r.getParams().put("receive_id", String.valueOf(taskInfo.get("receive_id").intValue()));
-            r.getParams().put("receive_from", "missionPage");
-            //从参数库中取参数
-            r.setParamFromLib("csrf");
-            //从请求头库中取请求头
-            r.setHeaderFromLib("cookie");
-        });
-        job.init();
-        //执行并定义处理函数
-        job.handlerHttpGroups("B站", "日常奖励" + jobName, (response, name) -> {
-            //结果处理
-            ObjectNode node = HttpUtil.handleResponse(response);
-            Assert.notNull(node, "response解析错误");
-            int code = node.get("code").intValue();
-            String stateInfo = state.getOrDefault(code, null);
-            if (!Objects.isNull(stateInfo)) {
-                log.info(name + "-----------" + stateInfo);
-                return true;
-            }
-            log.info(name + "领取失败(再次尝试)" + node.toString());
-            return false;
-        });
-    }
-
-    private String getRandMsg() {
-        return msgList.get(random.nextInt(6));
-    }
-
     @GetMapping("/getCdk")
     @ApiOperation("获取所有cdk")
     public void getCdk(String activity_id, HttpServletResponse response) throws IOException {
@@ -433,7 +389,7 @@ public class BiliController {
                     outputStream.write((name + "\n").getBytes(StandardCharsets.UTF_8));
                     JsonNode rewardList = node.get("data").get("list");
                     for (JsonNode rewardNode : rewardList) {
-                        String cdk = rewardNode.get("award_name").asText() + ":\t\t" + rewardNode.get("extra_info").get("cdkey_content").asText()+"\n";
+                        String cdk = rewardNode.get("award_name").asText() + ":\t\t" + rewardNode.get("extra_info").get("cdkey_content").asText() + "\n";
                         outputStream.write(cdk.getBytes(StandardCharsets.UTF_8));
                     }
                 } catch (IOException e) {
@@ -447,6 +403,42 @@ public class BiliController {
         outputStream.close();
 
     }
+
+    private AwardParamPojo getAwardParams(String awardId, Request r) {
+        //封装请求参数
+        Map<String, String> params = new HashMap<>();
+        params.put("id", awardId);
+        params.put("csrf", r.getParamLib().get("csrf"));
+        Map<String, String> headers = new HashMap<>();
+        headers.put("cookie", r.getHeaderLib().get("cookie"));
+
+        //发请求获取结果
+        ObjectNode node = HttpUtil.handleGet("https://api.bilibili.com/x/activity/mission/single_task", params, headers);
+
+        //解析结果,找到需要的参数
+        assert node != null;
+        JsonNode taskInfo = node.get("data").get("task_info");
+        JsonNode groupNode = taskInfo.get("group_list").get(0);
+
+        //封装结果
+        HashMap<String, String> paramsResult = new HashMap<>();
+        paramsResult.put("act_id", String.valueOf(groupNode.get("act_id").intValue()));
+        paramsResult.put("task_id", String.valueOf(groupNode.get("task_id").intValue()));
+        paramsResult.put("group_id", String.valueOf(groupNode.get("group_id").intValue()));
+        paramsResult.put("receive_id", String.valueOf(taskInfo.get("receive_id").intValue()));
+        paramsResult.put("receive_from", "missionPage");
+        HashMap<String, String> dataResult = new HashMap<>();
+        dataResult.put("receive_status", String.valueOf(taskInfo.get("receive_status").intValue()));
+
+
+        return new AwardParamPojo(paramsResult,dataResult);
+    }
+
+    private String getRandMsg() {
+        return msgList.get(random.nextInt(6));
+    }
+
+
 
 
 }
