@@ -1,6 +1,7 @@
 package com.example.requestdemo.controller;
 
 import com.example.requestdemo.entity.Group;
+import com.example.requestdemo.entity.ProjectProperties;
 import com.example.requestdemo.entity.Request;
 import com.example.requestdemo.job.MainJob;
 import com.example.requestdemo.pojo.AwardParamPojo;
@@ -46,6 +47,9 @@ public class BiliController {
     private final List<String> msgList = new ArrayList<>();
     private final Random random = new Random();
 
+    @Autowired
+    private ProjectProperties properties;
+
     @PostConstruct
     private void init() {
         msgList.add("哈哈哈哈");
@@ -68,6 +72,7 @@ public class BiliController {
     @GetMapping("/yuanshi")
     @ApiOperation("抢原石")
     public void mainReward(String id) {
+        System.out.println(1111);
         //设置group基本参数
         group.clear();
         group.setGlobalUrl("https://api.bilibili.com/x/activity/mission/task/reward/receive");
@@ -82,21 +87,40 @@ public class BiliController {
 
         //任务数量
         AtomicInteger taskNum = new AtomicInteger(group.getRequests().size());
+        //开始时间
+        long start = System.currentTimeMillis();
+        //运行时间(5分钟)
+        long duration = 1000 * 60 * 5;
 
         for (Request request : group.getRequests()) {
             job.getPool().submit(() -> {
                 log.info("原石" + request.getRequestName() + "参数获取中...");
                 //循环查询receive_id参数(是否能够领取)
                 while (true) {
+                    if (System.currentTimeMillis()>(start+duration)){
+                        break;
+                    }
                     //发请求获取结果
-                    AwardParamPojo awardParamPojo = getAwardParams(id, request);
+                    AwardParamPojo awardParamPojo = null;
+                    try {
+                        awardParamPojo = getAwardParams(id, request);
+                    } catch (Exception e) {
+                        log.error("error", e);
+                        try {
+                            Thread.sleep((long) (Math.random() * 100) + 100);
+                        } catch (InterruptedException ex) {
+                            throw new RuntimeException(ex);
+                        }
+                        continue;
+                    }
                     Map<String, String> params = awardParamPojo.getParams();
                     //还不能领取,继续获取参数
                     if (params.get("receive_id").equals("0")) {
+                        log.info("原石" + request.getRequestName() + "参数获取中...");
                         continue;
                     }
                     //已经领取过,直接结束
-                    if (awardParamPojo.getData().get("receive_status").equals("3")){
+                    if (awardParamPojo.getData().get("receive_status").equals("3")) {
                         log.info("原石" + request.getRequestName() + "已领取");
                         return;
                     }
@@ -115,6 +139,10 @@ public class BiliController {
                 ) {
                     while (true) {
                         CloseableHttpResponse response = response = client.execute(httpPost);
+                        if (System.currentTimeMillis()>(start+duration)){
+                            taskNum.decrementAndGet();
+                            break;
+                        }
                         ObjectNode node = HttpUtil.handleResponse(response);
                         if (Objects.isNull(node)) {
                             continue;
@@ -123,17 +151,19 @@ public class BiliController {
                         String stateInfo = states.getOrDefault(code, null);
                         if (!Objects.isNull(stateInfo)) {
                             log.info(group.getGroupName() + request.getRequestName() + "原石" + "-----------" + stateInfo);
-                            if (taskNum.decrementAndGet() <= 0) {
-                                log.info(group.getGroupName() + "原石" + "任务完成");
-                            }
+                            taskNum.decrementAndGet();
                             break;
                         }
-//                        log.info(group.getGroupName() + request.getRequestName() + "原石" + node.toString());
+                        log.info(group.getGroupName() + request.getRequestName() + "原石" + node.toString());
                     }
                 } catch (IOException e) {
                     log.info(e.getClass().getName());
                 }
+                if (taskNum.get() <= 0) {
+                    log.info(group.getGroupName() + "原石" + "任务完成");
+                }
             });
+
         }
     }
 
@@ -146,28 +176,25 @@ public class BiliController {
         group.setOnce(true);
         group.setInterval(1000);
         //初始化奖励map
-        LinkedHashMap<String, String> rewards = new LinkedHashMap<>();
-        rewards.put("1", "73af1865");//开播60分钟
-        rewards.put("2", "cec8a299");//开播120分钟
-        rewards.put("3", "bab2b65e");//10电池
-        rewards.put("4", "185290e3");//弹幕6条"
-        rewards.put("5", "b7e294d9");//礼物两人
-        rewards.put("6", "6223f94c");//看10分钟
+        Map<String, String> rewards = properties.getRewardMap();
         Map<Integer, String> states = new LinkedHashMap<>();
         states.put(0, "领取成功");
         states.put(-400, "任务未完成");
         states.put(75086, "已领取");
+        states.put(75255, "领完了");
         states.put(75154, "领完了");
 
-        group.getRequests().forEach(r->{
-            r.setParams(getAwardParams(rewards.get(jobIndex), r).getParams());
+        String job = rewards.getOrDefault(jobIndex,jobIndex);
+
+        group.getRequests().forEach(r -> {
+            r.setParams(getAwardParams(job, r).getParams());
             r.setHeaderFromLib("cookie");
             r.setParamFromLib("csrf");
         });
 
-        job.init();
+        this.job.init();
         //执行并定义处理函数
-        job.handlerHttpGroups("B站", "日常奖励" + jobIndex, (response, name) -> {
+        this.job.handlerHttpGroups("B站", "日常奖励" + jobIndex, (response, name) -> {
             //结果处理
             ObjectNode node = HttpUtil.handleResponse(response);
             Assert.notNull(node, "response解析错误");
@@ -285,8 +312,8 @@ public class BiliController {
     }
 
     @GetMapping("/sendGold")
-    @ApiOperation("送礼物")
-    public void sendGold(@RequestParam("送礼数量(填一半)") int goldNum) {
+    @ApiOperation("送礼物(数量填一半)")
+    public void sendGold(int goldNum) {
         group.clear();
         //初始化全局参数
         group.setGlobalUrl("https://api.live.bilibili.com/xlive/revenue/v1/gift/sendGold");
@@ -431,14 +458,12 @@ public class BiliController {
         dataResult.put("receive_status", String.valueOf(taskInfo.get("receive_status").intValue()));
 
 
-        return new AwardParamPojo(paramsResult,dataResult);
+        return new AwardParamPojo(paramsResult, dataResult);
     }
 
     private String getRandMsg() {
         return msgList.get(random.nextInt(6));
     }
-
-
 
 
 }

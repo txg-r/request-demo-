@@ -1,3 +1,12 @@
 project:
-#  jsonPath: C:\Users\18042\IdeaProjects\request-demo\src\main\resources\properties.json
+  #  json-path: C:\Users\tyfff\Desktop\p.json
+  #  jsonPath: C:\Users\18042\IdeaProjects\request-demo\src\main\resources\properties.json
   jsonPath: D:\脚本\properties.json
+  rewardMap:
+    1: "7093fa0c"
+    2: "a9e7e2b2"
+    3: "2e627210"
+    4: "75d9d363"
+    5: "b4087681"
+    6: "d9d808ce"
+

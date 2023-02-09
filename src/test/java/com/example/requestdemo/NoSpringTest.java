@@ -25,4 +25,9 @@ import static org.apache.http.impl.client.HttpClients.createDefault;
 
 public class NoSpringTest {
 
+    @Test
+    public void test1(){
+        System.out.println(Math.random());
+    }
+
 }
