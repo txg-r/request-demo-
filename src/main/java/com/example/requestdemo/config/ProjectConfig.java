@@ -1,7 +1,7 @@
 package com.example.requestdemo.config;
 
-import com.example.requestdemo.entity.ProjectProperties;
-import com.example.requestdemo.entity.RequestProperties;
+import com.example.requestdemo.domain.entity.ProjectProperties;
+import com.example.requestdemo.domain.entity.RequestProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;

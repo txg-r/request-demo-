@@ -1,4 +1,4 @@
-package com.example.requestdemo.entity;
+package com.example.requestdemo.domain.entity;
 
 
 import lombok.AllArgsConstructor;
@@ -7,7 +7,6 @@ import lombok.NoArgsConstructor;
 import org.apache.http.client.methods.HttpRequestBase;
 
 import java.io.Serializable;
-import java.util.List;
 import java.util.Map;
 
 @Data

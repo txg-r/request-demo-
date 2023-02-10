@@ -9,4 +9,10 @@ project:
     4: "75d9d363"
     5: "b4087681"
     6: "d9d808ce"
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://tangying-f.mysql.rds.aliyuncs.com:3306/cdk
+    username: root
+    password: A123456b
 

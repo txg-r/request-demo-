@@ -1,9 +1,9 @@
-package com.example.requestdemo.job;
+package com.example.requestdemo.domain.job;
 
-import com.example.requestdemo.entity.Group;
-import com.example.requestdemo.entity.HttpGroup;
-import com.example.requestdemo.entity.Request;
-import com.example.requestdemo.entity.RequestProperties;
+import com.example.requestdemo.domain.entity.Group;
+import com.example.requestdemo.domain.entity.HttpGroup;
+import com.example.requestdemo.domain.entity.Request;
+import com.example.requestdemo.domain.entity.RequestProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;

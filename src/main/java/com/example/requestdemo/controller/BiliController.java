@@ -1,10 +1,12 @@
 package com.example.requestdemo.controller;
 
-import com.example.requestdemo.entity.Group;
-import com.example.requestdemo.entity.ProjectProperties;
-import com.example.requestdemo.entity.Request;
-import com.example.requestdemo.job.MainJob;
+import com.example.requestdemo.domain.Cdk;
+import com.example.requestdemo.domain.entity.Group;
+import com.example.requestdemo.domain.entity.ProjectProperties;
+import com.example.requestdemo.domain.entity.Request;
+import com.example.requestdemo.domain.job.MainJob;
 import com.example.requestdemo.pojo.AwardParamPojo;
+import com.example.requestdemo.service.CdkService;
 import com.example.requestdemo.util.HttpUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,29 +14,23 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.tomcat.util.http.fileupload.IOUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.PostConstruct;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
@@ -49,6 +45,9 @@ public class BiliController {
 
     @Autowired
     private ProjectProperties properties;
+
+    @Autowired
+    private CdkService cdkService;
 
     @PostConstruct
     private void init() {
@@ -97,7 +96,7 @@ public class BiliController {
                 log.info("原石" + request.getRequestName() + "参数获取中...");
                 //循环查询receive_id参数(是否能够领取)
                 while (true) {
-                    if (System.currentTimeMillis()>(start+duration)){
+                    if (System.currentTimeMillis() > (start + duration)) {
                         break;
                     }
                     //发请求获取结果
@@ -139,7 +138,7 @@ public class BiliController {
                 ) {
                     while (true) {
                         CloseableHttpResponse response = response = client.execute(httpPost);
-                        if (System.currentTimeMillis()>(start+duration)){
+                        if (System.currentTimeMillis() > (start + duration)) {
                             taskNum.decrementAndGet();
                             break;
                         }
@@ -184,7 +183,7 @@ public class BiliController {
         states.put(75255, "领完了");
         states.put(75154, "领完了");
 
-        String job = rewards.getOrDefault(jobIndex,jobIndex);
+        String job = rewards.getOrDefault(jobIndex, jobIndex);
 
         group.getRequests().forEach(r -> {
             r.setParams(getAwardParams(job, r).getParams());
@@ -393,7 +392,7 @@ public class BiliController {
     }
 
     @GetMapping("/getCdk")
-    @ApiOperation("获取所有cdk")
+    @ApiOperation("获取所有cdk,并载入数据库")
     public void getCdk(String activity_id, HttpServletResponse response) throws IOException {
         group.clear();
         group.setGlobalUrl("https://api.bilibili.com/x/activity/rewards/awards/mylist");
@@ -411,21 +410,34 @@ public class BiliController {
         job.handlerHttpGroups("B站", "获取所有cdk", (biResponse, name) -> {
             ObjectNode node = HttpUtil.handleResponse(biResponse);
             Assert.notNull(node, "response解析错误");
-            if (node.get("code").intValue() == 0) {
-                try {
-                    outputStream.write((name + "\n").getBytes(StandardCharsets.UTF_8));
-                    JsonNode rewardList = node.get("data").get("list");
-                    for (JsonNode rewardNode : rewardList) {
-                        String cdk = rewardNode.get("award_name").asText() + ":\t\t" + rewardNode.get("extra_info").get("cdkey_content").asText() + "\n";
-                        outputStream.write(cdk.getBytes(StandardCharsets.UTF_8));
-                    }
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                return true;
+            if (node.get("code").intValue() != 0) {
+                log.info(name + "领取失败" + node.toString());
+                return false;
             }
-            log.info(name + "领取失败" + node.toString());
-            return false;
+            try {
+                outputStream.write(("\n" + name + "\n\n").getBytes(StandardCharsets.UTF_8));
+                JsonNode rewardList = node.get("data").get("list");
+                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd  HH:mm:ss");
+                for (JsonNode rewardNode : rewardList) {
+                    String award_name = rewardNode.get("award_name").asText();
+                    String cdk = rewardNode.get("extra_info").get("cdkey_content").asText();
+                    Date receive_time = new Date(rewardNode.get("receive_time").asLong() * 1000);
+                    String description = rewardNode.get("description").asText();
+                    outputStream.write((award_name + ":\t\t" + cdk + ":\t\t" + dateFormat.format(receive_time) + "\n")
+                            .getBytes(StandardCharsets.UTF_8));
+                    cdkService.saveDistinct(new Cdk(
+                            cdk,
+                            award_name,
+                            receive_time,
+                            description,
+                            "tyf"
+                    ));
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            return true;
+
         });
         outputStream.close();
 

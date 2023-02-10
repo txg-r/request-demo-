@@ -1,5 +1,5 @@
 
-package com.example.requestdemo.entity;
+package com.example.requestdemo.domain.entity;
 
 import java.io.Serializable;
 import java.util.LinkedHashMap;

@@ -1,4 +1,4 @@
-package com.example.requestdemo.entity;
+package com.example.requestdemo.domain.entity;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
