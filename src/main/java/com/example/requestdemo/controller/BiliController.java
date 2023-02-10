@@ -1,6 +1,7 @@
 package com.example.requestdemo.controller;
 
-import com.example.requestdemo.domain.Cdk;
+
+import com.example.requestdemo.domain.entity.Cdk;
 import com.example.requestdemo.domain.entity.Group;
 import com.example.requestdemo.domain.entity.ProjectProperties;
 import com.example.requestdemo.domain.entity.Request;
@@ -430,7 +431,8 @@ public class BiliController {
                             award_name,
                             receive_time,
                             description,
-                            "tyf"
+                            "tyf",
+                            false
                     ));
                 }
             } catch (IOException e) {
