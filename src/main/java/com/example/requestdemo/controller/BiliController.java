@@ -1,11 +1,13 @@
 package com.example.requestdemo.controller;
 
 
+import com.alibaba.excel.EasyExcel;
 import com.example.requestdemo.domain.entity.Cdk;
 import com.example.requestdemo.domain.entity.Group;
 import com.example.requestdemo.domain.entity.ProjectProperties;
 import com.example.requestdemo.domain.entity.Request;
 import com.example.requestdemo.domain.job.MainJob;
+import com.example.requestdemo.domain.vo.ExcelCdk;
 import com.example.requestdemo.pojo.AwardParamPojo;
 import com.example.requestdemo.service.CdkService;
 import com.example.requestdemo.util.HttpUtil;
@@ -20,15 +22,18 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.PostConstruct;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -392,9 +397,9 @@ public class BiliController {
 
     }
 
-    @GetMapping("/getCdk")
+    @GetMapping("/loadCdk")
     @ApiOperation("获取所有cdk,并载入数据库")
-    public void getCdk(String activity_id, HttpServletResponse response) throws IOException {
+    public void loadCdk(String activity_id, HttpServletResponse response) throws IOException {
         group.clear();
         group.setGlobalUrl("https://api.bilibili.com/x/activity/rewards/awards/mylist");
         group.setMethod("get");
@@ -443,6 +448,19 @@ public class BiliController {
         });
         outputStream.close();
 
+    }
+
+    @GetMapping("/getCdk")
+    @ApiOperation("取出指定的cdk")
+    @Transactional
+    public void download(HttpServletResponse response, @RequestParam String awardName, @RequestParam int awardNum) throws IOException {
+        // 这里注意 有同学反应使用swagger 会导致各种问题，请直接用浏览器或者用postman
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setCharacterEncoding("utf-8");
+        // 这里URLEncoder.encode可以防止中文乱码 当然和easyexcel没有关系
+        String fileName = URLEncoder.encode("cdk", "UTF-8").replaceAll("\\+", "%20");
+        response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
+        EasyExcel.write(response.getOutputStream(), ExcelCdk.class).sheet("cdk").doWrite(cdkService.getCdk(awardName,awardNum));
     }
 
     private AwardParamPojo getAwardParams(String awardId, Request r) {
