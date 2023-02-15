@@ -13,8 +13,18 @@
             <result property="isSell" column="is_sell" jdbcType="BIT"/>
     </resultMap>
 
+    <resultMap id="awardCount" type="com.example.requestdemo.domain.entity.AwardCount">
+        <result column="name" property="awardName"/>
+        <result column="count" property="count"/>
+    </resultMap>
+
+
     <sql id="Base_Column_List">
         cdk_id,award_name,receive_time,
         description,owner,is_sell
     </sql>
+
+    <select id="getAWardCount" resultMap="awardCount">
+        select award_name name,count(*) count from cdk where owner=#{owner} and is_sell=0 group by award_name;
+    </select>
 </mapper>

@@ -22,6 +22,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,6 +50,8 @@ public class BiliController {
     private final List<String> msgList = new ArrayList<>();
     private final Random random = new Random();
 
+    @Value("${project.awardOwner}")
+    private String owner;
     @Autowired
     private ProjectProperties properties;
 
@@ -73,6 +76,12 @@ public class BiliController {
 
     private Group group;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @GetMapping("/detail")
+    @ApiOperation("获取兑换码数量")
+    public Map<String,Integer> getAwardCount(){
+        return cdkService.getAwardCount(owner);
+    }
 
     @GetMapping("/yuanshi")
     @ApiOperation("抢原石")
@@ -458,9 +467,10 @@ public class BiliController {
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setCharacterEncoding("utf-8");
         // 这里URLEncoder.encode可以防止中文乱码 当然和easyexcel没有关系
-        String fileName = URLEncoder.encode("cdk", "UTF-8").replaceAll("\\+", "%20");
+        String fileName = URLEncoder.encode(awardName, "UTF-8").replaceAll("\\+", "%20");
         response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
         EasyExcel.write(response.getOutputStream(), ExcelCdk.class).sheet("cdk").doWrite(cdkService.getCdk(awardName,awardNum));
+        log.info("取出"+awardName+awardNum);
     }
 
     private AwardParamPojo getAwardParams(String awardId, Request r) {

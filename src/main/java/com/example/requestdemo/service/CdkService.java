@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.example.requestdemo.domain.vo.ExcelCdk;
 
 import java.util.List;
+import java.util.Map;
 
 /**
 * @author huoer
@@ -16,4 +17,6 @@ public interface CdkService extends IService<Cdk> {
     void saveDistinct(Cdk cdk);
 
     List<ExcelCdk> getCdk(String awardName, int awardNum);
+
+    Map<String, Integer> getAwardCount(String owner);
 }
