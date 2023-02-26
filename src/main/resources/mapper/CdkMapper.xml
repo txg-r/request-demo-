@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.requestdemo.mapper.CdkMapper">
+
+    <resultMap id="BaseResultMap" type="com.example.requestdemo.domain.Cdk">
+            <id property="cdkId" column="cdk_id" jdbcType="VARCHAR"/>
+            <result property="awardName" column="award_name" jdbcType="VARCHAR"/>
+            <result property="receiveTime" column="receive_time" jdbcType="TIMESTAMP"/>
+            <result property="description" column="description" jdbcType="VARCHAR"/>
+            <result property="owner" column="owner" jdbcType="CHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        cdk_id,award_name,receive_time,
+        description,owner
+    </sql>
+</mapper>
