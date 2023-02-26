@@ -1,4 +1,4 @@
-package com.example.requestdemo.domain.job;
+package com.example.requestdemo.job;
 
 import com.example.requestdemo.controller.BiliController;
 import org.springframework.beans.factory.annotation.Autowired;

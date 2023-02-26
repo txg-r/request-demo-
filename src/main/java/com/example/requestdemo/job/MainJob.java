@@ -1,4 +1,4 @@
-package com.example.requestdemo.domain.job;
+package com.example.requestdemo.job;
 
 import com.example.requestdemo.domain.entity.Group;
 import com.example.requestdemo.domain.entity.HttpGroup;

@@ -6,7 +6,7 @@ import com.example.requestdemo.domain.entity.Cdk;
 import com.example.requestdemo.domain.entity.Group;
 import com.example.requestdemo.domain.entity.ProjectProperties;
 import com.example.requestdemo.domain.entity.Request;
-import com.example.requestdemo.domain.job.MainJob;
+import com.example.requestdemo.job.MainJob;
 import com.example.requestdemo.domain.vo.ExcelCdk;
 import com.example.requestdemo.pojo.AwardParamPojo;
 import com.example.requestdemo.service.CdkService;
@@ -433,6 +433,7 @@ public class BiliController {
                 outputStream.write(("\n" + name + "\n\n").getBytes(StandardCharsets.UTF_8));
                 JsonNode rewardList = node.get("data").get("list");
                 SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd  HH:mm:ss");
+                ArrayList<Cdk> saveCdkList = new ArrayList<>();
                 for (JsonNode rewardNode : rewardList) {
                     String award_name = rewardNode.get("award_name").asText();
                     String cdk = rewardNode.get("extra_info").get("cdkey_content").asText();
@@ -440,7 +441,7 @@ public class BiliController {
                     String description = rewardNode.get("description").asText();
                     outputStream.write((award_name + ":\t\t" + cdk + ":\t\t" + dateFormat.format(receive_time) + "\n")
                             .getBytes(StandardCharsets.UTF_8));
-                    cdkService.saveDistinct(new Cdk(
+                    saveCdkList.add(new Cdk(
                             cdk,
                             award_name,
                             receive_time,
@@ -449,6 +450,7 @@ public class BiliController {
                             false
                     ));
                 }
+                cdkService.saveBatchDistinct(saveCdkList);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

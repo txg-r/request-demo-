@@ -23,6 +23,13 @@
         cdk_id,award_name,receive_time,
         description,owner,is_sell
     </sql>
+    <insert id="insertBatchDistinct">
+        insert ignore into cdk values
+        <foreach collection ="cdk" item="item" separator =",">
+            (#{item.cdkId,jdbcType=VARCHAR}, #{item.awardName,jdbcType=VARCHAR}, #{item.receiveTime,jdbcType=DATE}
+            ,#{item.description,jdbcType=VARCHAR},#{item.owner,jdbcType=VARCHAR},#{item.isSell,jdbcType=BIT})
+        </foreach >
+    </insert>
 
     <select id="getAWardCount" resultMap="awardCount">
         select award_name name,count(*) count from cdk where owner=#{owner} and is_sell=0 group by award_name;

@@ -1,4 +1,4 @@
-package com.example.requestdemo.domain;
+package com.example.requestdemo.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -45,6 +45,8 @@ public class Cdk implements Serializable {
      * 所属人
      */
     private String owner;
+
+    private Boolean isSell;
 
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;

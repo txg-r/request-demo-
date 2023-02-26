@@ -7,9 +7,9 @@ import com.example.requestdemo.domain.entity.Cdk;
 import com.example.requestdemo.domain.vo.ExcelCdk;
 import com.example.requestdemo.service.CdkService;
 import com.example.requestdemo.mapper.CdkMapper;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,13 +24,6 @@ import java.util.stream.Collectors;
 public class CdkServiceImpl extends ServiceImpl<CdkMapper, Cdk>
         implements CdkService {
 
-    @Override
-    public void saveDistinct(Cdk cdk) {
-        if (baseMapper.selectById(cdk.getCdkId()) != null) {
-            return;
-        }
-        baseMapper.insert(cdk);
-    }
 
     @Override
     public List<ExcelCdk> getCdk(String awardName, int awardNum) {
@@ -38,7 +31,8 @@ public class CdkServiceImpl extends ServiceImpl<CdkMapper, Cdk>
                 .like(Cdk::getAwardName, awardName)
                 .eq(Cdk::getIsSell,false)
                 .last("limit " + awardNum);
-        return baseMapper.selectList(wrapper).stream().map(cdk -> {
+        List<Cdk> cdks = baseMapper.selectList(wrapper);
+        return cdks.stream().map(cdk -> {
             cdk.setIsSell(true);
             baseMapper.updateById(cdk);
             return new ExcelCdk(cdk.getAwardName(), cdk.getCdkId());
@@ -50,6 +44,13 @@ public class CdkServiceImpl extends ServiceImpl<CdkMapper, Cdk>
     public Map<String, Integer> getAwardCount(String owner) {
         HashMap<String, Integer> result = new HashMap<>();
         return baseMapper.getAWardCount(owner).stream().collect(Collectors.toMap(AwardCount::getAwardName, AwardCount::getCount));
+    }
+
+    @Override
+    public void saveBatchDistinct(ArrayList<Cdk> saveCdkList) {
+        if (!saveCdkList.isEmpty()){
+            baseMapper.insertBatchDistinct(saveCdkList);
+        }
     }
 }
 

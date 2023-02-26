@@ -4,16 +4,34 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.requestdemo.mapper.CdkMapper">
 
-    <resultMap id="BaseResultMap" type="com.example.requestdemo.domain.Cdk">
+    <resultMap id="BaseResultMap" type="com.example.requestdemo.domain.entity.Cdk">
             <id property="cdkId" column="cdk_id" jdbcType="VARCHAR"/>
             <result property="awardName" column="award_name" jdbcType="VARCHAR"/>
             <result property="receiveTime" column="receive_time" jdbcType="TIMESTAMP"/>
             <result property="description" column="description" jdbcType="VARCHAR"/>
             <result property="owner" column="owner" jdbcType="CHAR"/>
+            <result property="isSell" column="is_sell" jdbcType="BIT"/>
     </resultMap>
+
+    <resultMap id="awardCount" type="com.example.requestdemo.domain.entity.AwardCount">
+        <result column="name" property="awardName"/>
+        <result column="count" property="count"/>
+    </resultMap>
+
 
     <sql id="Base_Column_List">
         cdk_id,award_name,receive_time,
-        description,owner
+        description,owner,is_sell
     </sql>
+    <insert id="insertBatchDistinct">
+        insert ignore into cdk values
+        <foreach collection ="cdk" item="item" separator =",">
+            (#{item.cdkId,jdbcType=VARCHAR}, #{item.awardName,jdbcType=VARCHAR}, #{item.receiveTime,jdbcType=DATE}
+            ,#{item.description,jdbcType=VARCHAR},#{item.owner,jdbcType=VARCHAR},#{item.isSell,jdbcType=BIT})
+        </foreach >
+    </insert>
+
+    <select id="getAWardCount" resultMap="awardCount">
+        select award_name name,count(*) count from cdk where owner=#{owner} and is_sell=0 group by award_name;
+    </select>
 </mapper>
