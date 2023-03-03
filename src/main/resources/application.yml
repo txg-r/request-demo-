@@ -1,7 +1,7 @@
 project:
   #  json-path: C:\Users\tyfff\Desktop\p.json
   #  jsonPath: C:\Users\18042\IdeaProjects\request-demo\src\main\resources\properties.json
-  jsonPath: D:\脚本\properties.json
+  jsonPath: D:\脚本\properties-tyf.json
   rewardMap:
     1: "7093fa0c"
     2: "a9e7e2b2"

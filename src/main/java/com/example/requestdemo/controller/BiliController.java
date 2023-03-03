@@ -2,10 +2,7 @@ package com.example.requestdemo.controller;
 
 
 import com.alibaba.excel.EasyExcel;
-import com.example.requestdemo.domain.entity.Cdk;
-import com.example.requestdemo.domain.entity.Group;
-import com.example.requestdemo.domain.entity.ProjectProperties;
-import com.example.requestdemo.domain.entity.Request;
+import com.example.requestdemo.domain.entity.*;
 import com.example.requestdemo.job.MainJob;
 import com.example.requestdemo.domain.vo.ExcelCdk;
 import com.example.requestdemo.pojo.AwardParamPojo;
@@ -17,18 +14,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.PostConstruct;
 import javax.servlet.ServletOutputStream;
@@ -38,7 +28,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 
 @RestController
@@ -83,7 +73,7 @@ public class BiliController {
         return cdkService.getAwardCount(owner);
     }
 
-    @GetMapping("/yuanshi")
+/*    @GetMapping("/yuanshi")
     @ApiOperation("抢原石")
     public void mainReward(String id) {
         System.out.println(1111);
@@ -179,7 +169,7 @@ public class BiliController {
             });
 
         }
-    }
+    }*/
 
     @GetMapping("/dayReward")
     @ApiOperation("每日奖励(1:开播60分钟,2:开播120分钟,3:10电池,4:弹幕六条,5:礼物两人,6:看十分钟")
@@ -435,24 +425,14 @@ public class BiliController {
                 SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd  HH:mm:ss");
                 ArrayList<Cdk> saveCdkList = new ArrayList<>();
                 for (JsonNode rewardNode : rewardList) {
-                    String award_name = rewardNode.get("award_name").asText();
-                    String cdk = rewardNode.get("extra_info").get("cdkey_content").asText();
-                    Date receive_time = new Date(rewardNode.get("receive_time").asLong() * 1000);
-                    String description = rewardNode.get("description").asText();
-                    outputStream.write((award_name + ":\t\t" + cdk + ":\t\t" + dateFormat.format(receive_time) + "\n")
-                            .getBytes(StandardCharsets.UTF_8));
-                    saveCdkList.add(new Cdk(
-                            cdk,
-                            award_name,
-                            receive_time,
-                            description,
-                            "tyf",
-                            false
-                    ));
+                    Cdk cdk = parseRewardJsonNode(rewardNode);
+                    if (cdk!=null){
+                        saveCdkList.add(cdk);
+                    }
                 }
                 cdkService.saveBatchDistinct(saveCdkList);
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                log.error("IOError:\t"+e.getMessage());
             }
             return true;
 
@@ -461,18 +441,60 @@ public class BiliController {
 
     }
 
-    @GetMapping("/getCdk")
+    private Cdk parseRewardJsonNode(JsonNode rewardNode){
+        try {
+            String award_name = rewardNode.get("activity_id").asText()+":"+rewardNode.get("award_name").asText();
+            String cdk = rewardNode.get("extra_info").get("cdkey_content").asText();
+            Date receive_time = new Date(rewardNode.get("receive_time").asLong() * 1000);
+            String description = rewardNode.get("description").asText();
+            return new Cdk(
+                    cdk,
+                    award_name,
+                    receive_time,
+                    description,
+                    owner,
+                    false
+            );
+        }catch (NullPointerException e){
+            log.error("NullError:\t"+e.getMessage());
+            return null;
+        }
+    }
+
+    @PostMapping("/getCdk")
     @ApiOperation("取出指定的cdk")
     @Transactional
-    public void download(HttpServletResponse response, @RequestParam String awardName, @RequestParam int awardNum) throws IOException {
-        // 这里注意 有同学反应使用swagger 会导致各种问题，请直接用浏览器或者用postman
-        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        response.setCharacterEncoding("utf-8");
-        // 这里URLEncoder.encode可以防止中文乱码 当然和easyexcel没有关系
-        String fileName = URLEncoder.encode(awardName, "UTF-8").replaceAll("\\+", "%20");
-        response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
-        EasyExcel.write(response.getOutputStream(), ExcelCdk.class).sheet("cdk").doWrite(cdkService.getCdk(awardName,awardNum));
-        log.info("取出"+awardName+awardNum);
+    public void download(HttpServletResponse response, @RequestBody List<AwardVo> awardVoList) throws IOException {
+        StringBuilder actionName = new StringBuilder();
+        awardVoList.forEach(awardVo -> {
+            actionName.append("\n").append(awardVo.getAwardName()).append(":").append(awardVo.getAwardCount());
+        });
+        List<ExcelCdk> collect = awardVoList.stream()
+                .flatMap(awardVo -> cdkService.getCdk(awardVo.getAwardName(), awardVo.getAwardCount()).stream())
+                .collect(Collectors.toList());
+        ServletOutputStream outputStream = response.getOutputStream();
+        if (collect.size()<10){
+            response.setContentType("text/html");
+            response.setHeader("Content-Disposition", "attachment;fileName=cdk.txt");
+            collect.forEach(award->{
+                try {
+                    outputStream.write((award.getAwardName()+":\t"+award.getCdk()+"\n").getBytes());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }else {
+            // 这里注意 有同学反应使用swagger 会导致各种问题，请直接用浏览器或者用postman
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setCharacterEncoding("utf-8");
+            // 这里URLEncoder.encode可以防止中文乱码 当然和easyexcel没有关系
+            String fileName = URLEncoder.encode("cdk", "UTF-8").replaceAll("\\+", "%20");
+            response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
+            EasyExcel.write(outputStream, ExcelCdk.class).sheet("cdk").doWrite(collect);
+        }
+
+        log.info("取出"+actionName);
+
     }
 
     private AwardParamPojo getAwardParams(String awardId, Request r) {
